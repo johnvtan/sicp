@@ -21,7 +21,13 @@
   (define (helper state a b)
     (cond
       [(= b 0) state]
+
+      ; Basically increasing step-size by doubling a
+      ; Eventually, the next line is executed and state
+      ; is incremented by a
       [(even? b) (helper state (double a) (halve b))]
+
+      ; This always executes at least once for b >= 1
       [else (helper (+ a state) a (- b 1))]))
   (helper 0 a b))
 

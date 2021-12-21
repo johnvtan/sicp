@@ -45,4 +45,5 @@
 (search-for-primes 100001 3)
 (search-for-primes 1000001 3)
 (search-for-primes 10000001 3)
+(search-for-primes 100000001 3)
 (search-for-primes 1000000001 3)
