@@ -1,3 +1,0 @@
-The closure property means that the results of combining something from some operation can
-themselves be combined using the same operation.
-e.g., (cons (cons 1 2) (cons 3 4))
