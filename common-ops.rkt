@@ -1,7 +1,8 @@
 ; Common operations that are used in SICP, but not part of Racket's SICP dialect
 #lang sicp
 
-(#%provide accumulate accumulate-n fold-left fold-right flatmap enumerate-interval)
+(#%provide accumulate accumulate-n filter fold-left fold-right flatmap enumerate-interval
+  first second third fourth)
 
 (define (accumulate op initial sequence)
   (if (null? sequence)
@@ -14,6 +15,13 @@
     nil
     (cons (accumulate op init (accumulate op init (map car seqs)))
           (accumulate-n op init (accumulate op init (map cdr seqs))))))
+
+ (define (filter predicate sequence) 
+   (cond ((null? sequence) nil) 
+         ((predicate (car sequence)) 
+          (cons (car sequence)  
+                (filter predicate (cdr sequence)))) 
+         (else (filter predicate (cdr sequence))))) 
 
 (define fold-right accumulate)
 (define (fold-left op initial sequence)
@@ -40,3 +48,15 @@
       acc
       (iter (cons k acc) (- k 1))))
   (iter '() end))
+
+(define (first lst)
+  (car lst))
+
+(define (second lst)
+  (cadr lst))
+
+(define (third lst)
+  (caddr lst))
+
+(define (fourth lst)
+  (cadddr lst))
