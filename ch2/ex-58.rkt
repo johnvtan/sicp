@@ -23,7 +23,7 @@
 ; need to either redefine how numbers/variables work, or unpack simple exprs like that
 (define (split-by-+ x)
   (define (unpack-if-simple x)
-    (if (= (length x) 1)
+    (if (null? (cdr x))
       (car x)
       x))
   (define (iter curr-sub-exp acc rest-of-exp)
@@ -97,4 +97,4 @@
 (deriv '(x * (x + 2 + x + 4)) 'x)
 (deriv '(x + 3 * (x + y + 2)) 'x)
 (deriv '(x + 3 * x * x + x) 'x)
-(deriv '(3 * x * x * x + 2 * x + x * y) 'x)
+(deriv '(3 * x * x * x + 2 * x + x * y * y) 'x)
