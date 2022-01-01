@@ -27,7 +27,7 @@
     ; handle cases where left/right are not leaves AND the symbol is in the symbol list
     [(and (not (leaf? (right-branch tree))) (contains? sym (symbols (right-branch tree))))
       (cons 1 (encode-symbol sym (right-branch tree)))]
-    [(and (not (leaf? (left-branch tree)) (contains? sym (symbols (left-branch tree)))))
+    [(and (not (leaf? (left-branch tree))) (contains? sym (symbols (left-branch tree))))
       (cons 0 (encode-symbol sym (left-branch tree)))]
 
     ; all other cases suck
