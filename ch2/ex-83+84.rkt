@@ -112,7 +112,17 @@
   (put 'add '(integer integer) +)
   (put 'sub '(integer integer) -)
   (put 'mul '(integer integer) *)
-  (put 'div '(integer integer) /)
+  ; should this naturally convert to a rational number?
+  ; like scheme's implementation??
+  (put 'div '(integer integer)
+    (lambda (x y)
+      (cond
+        ; I wonder how bad it is to compute the remainder here
+        ; should I just do the division and throw it away if
+        ; we need to make a rational?
+        [(and (> x y) (= (remainder x y) 0)) (/ x y)]
+        [else (make-rational x y)])))
+
   (put 'equ? '(integer integer) =)
   (put '=zero? '(integer) (lambda (x) (= x 0)))
   (put 'make 'integer (lambda (x) x))
@@ -120,6 +130,8 @@
   (put 'add '(real real) +)
   (put 'sub '(real real) -)
   (put 'mul '(real real) *)
+
+  ; I guess reals are floats, so / will also return a float
   (put 'div '(real real) /)
   (put 'equ? '(real real) =)
   (put '=zero? '(real) (lambda (x) (= x 0)))
@@ -240,7 +252,8 @@
 (define (make-complex-from-mag-ang r a)
   ((get 'make-from-mag-ang 'complex) r a))
 
-
+; The only thing you should need to do if you want to add new levels to the tower
+; is to add a conversion functoin using add-raise-func
 (add 3 4 (make-rational 3 4) 3.21 (make-complex-from-real-imag 3 1))
 (sub 10 4 (make-rational 3 4) 3.21 (make-complex-from-real-imag 3 1))
 (mul 3 4 (make-rational 3 4) 3.21 (make-complex-from-real-imag 3 1))
@@ -248,8 +261,10 @@
 (equ? (make-complex-from-real-imag 3 0) (make-rational 12 4))
 (equ? (make-complex-from-real-imag 3 1) (make-rational 12 4))
 (equ? 3 (make-rational 9 4))
-
-
+(div 4 5)
+(div 8 2)
+(div 1.23 3.45)
+ 
 ; I'm not really sure how this should work?
 ; scheme returns a rational numer (4/5) from (/ 4 5)
 ; which is apparently != 0.8
