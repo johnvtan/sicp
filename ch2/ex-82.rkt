@@ -38,30 +38,53 @@
     [else (error "Bad tagged datum: CONTENTS" datum)]))
 
 (define (apply-generic op . args)
-  (let [(type-tags (map type-tag args))]
-    (let [(proc (get op type-tags))]
+  ; I'll implement a different strategy for handling multiple arguments
+  ; of different types
+  ; Instead of trying to convert every argument to a single type, I'll just
+  ; go left to right and convert as necessary
+
+  (define (apply-bin-op-same-type type a1 a2)
+    ;(display (list 'apply-bin-op-same-type (list type a1 a2)))
+    (let [(proc (get op (list type type)))]
       (if proc
-        (apply proc (map contents args))
-        ; look for conversions between the types
-        ; This only does a single depth search for conversion
-        ; If you really wanted to go nuts with this, you could frame
-        ; this as a graph search and try to find a path from t1 to t2
-        ; in the case that there's no direct conversion from t1->t2 or t2->t1,
-        ; but there exists some intermediate type t3 for which t1->t3/t3->t1 and
-        ; t2->t3/t3->t2 exists.
-        (if (= (length args) 2)
-          (let [(type1 (car type-tags))
-                (type2 (cadr type-tags))
-                (a1 (car args))
-                (a2 (cadr args))]
-            (let [(t1->t2 (get-coercion type1 type2))
-                  (t2->t1 (get-coercion type2 type1))]
-              (cond
-                [t1->t2 (apply-generic op (t1->t2 a1) a2)]
-                [t2->t1 (apply-generic op a1 (t2->t1 a2))]
-                [else (error "No method for these types" (list op type-tags))])))
-          (error "No method for these type tags" (list op type-tags)))))))
-      
+        (proc a1 a2)
+        (error "No method for these types" (list op type type)))))
+
+  (define (convert-and-apply-bin-op type1 a1 type2 a2)
+    (let [(t1->t2 (get-coercion type1 type2))
+          (t2->t1 (get-coercion type2 type1))]
+      ;(display (list 'convert-and-apply-bin-op t1->t2 t2->t1 type1 type2)) (newline)
+      (cond
+        [t1->t2 (apply-bin-op-same-type type2 (contents (t1->t2 a1)) a2)]
+        [t2->t1 (apply-bin-op-same-type type1 a1 (contents (t2->t1 a2)))]
+        [else (error "No conversion for these types" (list op type1 type2))])))
+
+  (define (apply-op-multiple-args args)
+    (foldl
+      (lambda (arg acc)
+        (let [(type1 (type-tag acc))
+              (type2 (type-tag arg))
+              (a1 (contents acc))
+              (a2 (contents arg))]
+        ;(display (list 'apply-op-multiple-args op arg acc)) (newline)
+        (if (eq? type1 type2)
+          (apply-bin-op-same-type type1 a1 a2)
+          (convert-and-apply-bin-op type1 a1 type2 a2))))
+      (car args)
+      (cdr args)))
+  
+  (define (apply-op-single-arg arg)
+    (let [(proc (get op (list (type-tag arg))))]
+      (if proc
+        (proc (contents arg))
+        (error "No method found for this type" (list op (type-tag arg))))))
+  
+  ;(display (list 'apply-generic op args)) (newline)
+  (cond
+    [(null? args) (error "No 0-argument methods implemented" (list op))]
+    [(null? (cdr args)) (apply-op-single-arg (car args))]
+    [else (apply-op-multiple-args args)]))
+     
 (define (install-scheme-number-package)
   (define (tag x) (attach-tag 'scheme-number x))
   (put 'add '(scheme-number scheme-number) +)
@@ -157,10 +180,13 @@
   'complex)
 (install-complex-package)
 
-(define (add x y) (apply-generic 'add x y))
-(define (sub x y) (apply-generic 'sub x y))
-(define (mul x y) (apply-generic 'mul x y))
-(define (div x y) (apply-generic 'div x y))
+(define (add . args) (apply apply-generic 'add args))
+(define (sub . args) (apply apply-generic 'sub args))
+(define (mul . args) (apply apply-generic 'mul args))
+(define (div . args) (apply apply-generic 'div args))
+
+; This is a little weird? interface is how 2 argument requirement
+; is enforced, but in apply-generic equ? could take any number of args
 (define (equ? x y) (apply-generic 'equ? x y))
 (define (=zero? x) (apply-generic '=zero? x))
 
@@ -178,8 +204,23 @@
 (define (make-complex-from-mag-ang r a)
   ((get 'make-from-mag-ang 'complex) r a))
 
-coercion-table
 
-(#%provide add sub mul div make-scheme-number make-rational
-           make-complex-from-real-imag make-complex-from-mag-ang
-           equ? magnitude angle real-part imag-part =zero?)
+; (#%provide add sub mul div make-scheme-number make-rational
+;            make-complex-from-real-imag make-complex-from-mag-ang
+;            equ? magnitude angle real-part imag-part =zero?)
+
+(div 3 4 5 6)
+(add 3 (make-rational 4 6) 7 (make-rational 8 10))
+(add (make-complex-from-real-imag 2 3) 3 10 (make-complex-from-real-imag 4 5))
+
+; The strategy explained in the book (trying to convert all to a single arg type at first)
+; would not work if there's some type a->b->c, and c->b->a, but only args of
+; type a and c are used (where -> means convertible to)
+; The implemented solution here has the same problem, and additionally has the problem that
+; we don't get up-front information about whether the whole computation can be performed.
+; If we get an error with the implemented solution (i.e, converting two at a time), it will
+; only be after potentially doing a lot of the computation, whereas with the suggestede solution
+; we will know whether the computation is doable before doing the actual procedure. 
+
+; The advantage of the solution implemented here is that only binary operators need to be defined
+; There's no need to register
