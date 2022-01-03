@@ -170,6 +170,10 @@
         ; we need to make a rational?
         [(and (> x y) (= (remainder x y) 0)) (/ x y)]
         [else (make-rational x y)])))
+  (put 'sine '(integer) sin)
+  (put 'cosine '(integer) cos)
+  (put 'square-root '(integer) sqrt)
+  (put 'arctan '(integer integer) atan)
 
   (put 'equ? '(integer integer) =)
   (put '=zero? '(integer) (lambda (x) (= x 0)))
@@ -181,6 +185,10 @@
 
   ; I guess reals are floats, so / will also return a float
   (put 'div '(real real) /)
+  (put 'sine '(real) sin)
+  (put 'cosine '(real) cos)
+  (put 'square-root '(real) sqrt)
+  (put 'arctan '(real real) atan)
 
   ; TODO inexact equality for reals with arbitrary threshold
   (put 'equ? '(real real) 
@@ -193,28 +201,30 @@
   (add-raise-func 'real 'complex (lambda (x) (make-complex-from-real-imag x 0)))
   'scheme-number)
 
-
 (define (install-rational-package)
   (define (numer x) (car x))
   (define (denom x) (cadr x))
+
+  ; gcd will not work with non-reals/integers
+  ; rationals get messed up if we let complex numbers as numer/denoms
   (define (make-rat n d)
     (let [(g (gcd n d))]
       (list (/ n g) (/ d g))))
 
   (define (add-rat x y)
-    (make-rat (+ (* (numer x) (denom y))
-                (* (numer y) (denom x)))
-              (* (denom x) (denom y))))
+    (make-rat (add (mul (numer x) (denom y))
+                   (mul (numer y) (denom x)))
+              (mul (denom x) (denom y))))
   (define (sub-rat x y)
-    (make-rat (- (* (numer x) (denom y))
-                (* (numer y) (denom x)))
-              (* (denom x) (denom y))))
+    (make-rat (sub (mul (numer x) (denom y))
+                   (mul (numer y) (denom x)))
+              (mul (denom x) (denom y))))
   (define (mul-rat x y)
-    (make-rat (* (numer x) (numer y))
-              (* (denom x) (denom y))))
+    (make-rat (mul (numer x) (numer y))
+              (mul (denom x) (denom y))))
   (define (div-rat x y)
-    (make-rat (* (numer x) (denom y))
-              (* (denom x) (numer y))))
+    (make-rat (mul (numer x) (denom y))
+              (mul (denom x) (numer y))))
   
   ; assuming they are all reduced
   (define (equ-rat? x y)
@@ -241,6 +251,15 @@
   ; feels weird to be mixing my number system with builtins, but...
   (add-raise-func 'rational 'real (lambda (r) (/ (numer r) (denom r))))
 
+  (define (raise-to-real x)
+      ((get-raise-func 'rational 'real) (tag x)))
+
+  (put 'sine '(rational) (lambda (x) (sin (raise-to-real x))))
+  (put 'cosine '(rational) (lambda (x) (cos (raise-to-real x))))
+  (put 'square-root '(rational) (lambda (x) (sqrt (raise-to-real x))))
+  (put 'arctan '(rational rational)
+    (lambda (y x) (atan (raise-to-real y) (raise-to-real x))))
+
   (add-project-func 'rational 'integer
     (lambda (x) (round (/ (numer x) (denom x)))))
 
@@ -251,17 +270,18 @@
   'rational)
 
 (define (install-complex-package)
-  (define (square x) (* x x))
+  (define (square x) (mul x x))
+
   (define (install-rectangular-package)
     (define (real-part z) (car z))
     (define (imag-part z) (cadr z))
     (define (make-from-real-imag x y) (list x y))
     (define (magnitude z)
-      (sqrt (+ (square (real-part z)) (square (imag-part z)))))
+      (square-root (add (square (real-part z)) (square (imag-part z)))))
     (define (angle z)
-      (atan (imag-part z) (real-part z)))
+      (arctan (imag-part z) (real-part z)))
     (define (make-from-mag-ang r a)
-      (cons (* r (cos a)) (* r (sin a))))
+      (list (mul r (cosine a)) (mul r (sine a))))
     
     (define (tag x) (attach-tag 'rectangular x))
     (put 'real-part '(rectangular) real-part)
@@ -279,12 +299,12 @@
     (define (angle z) (cadr z))
     (define (make-from-mag-ang r a) (list r a))
 
-    (define (real-part z) (* (magnitude z) (cos (angle z))))
+    (define (real-part z) (mul (magnitude z) (cos (angle z))))
     (define (imag-part z) 
-      (* (magnitude z) (sin (angle z))))
+      (mul (magnitude z) (sin (angle z))))
     (define (make-from-real-imag x y)
-      (cons (sqrt (+ square x) (square y))
-            (atan y x)))
+      (list (square-root (add (square x) (square y)))
+            (arctan y x)))
     
     (define (tag x) (attach-tag 'polar x))
     (put 'real-part '(polar) real-part)
@@ -329,20 +349,20 @@
                          (eq? (imag-part z1) (imag-part z2)))))
 
   (define (add-complex z1 z2)
-    (make-complex-from-real-imag (+ (real-part z1) (real-part z2))
-                        (+ (imag-part z1) (imag-part z2))))
+    (make-complex-from-real-imag (add (real-part z1) (real-part z2))
+                        (add (imag-part z1) (imag-part z2))))
 
   (define (sub-complex z1 z2)
-    (make-complex-from-real-imag (- (real-part z1) (real-part z2))
-                        (- (imag-part z1) (imag-part z2))))
+    (make-complex-from-real-imag (sub (real-part z1) (real-part z2))
+                        (sub (imag-part z1) (imag-part z2))))
 
   (define (mul-complex z1 z2)
-    (make-complex-from-mag-ang (* (magnitude z1) (magnitude z2))
-                      (+ (angle z1) (angle z2))))
+    (make-complex-from-mag-ang (mul (magnitude z1) (magnitude z2))
+                      (add (angle z1) (angle z2))))
 
   (define (div-complex z1 z2)
-    (make-complex-from-mag-ang (/ (magnitude z1) (magnitude z2))
-                      (- (angle z1) (angle z2))))
+    (make-complex-from-mag-ang (div (magnitude z1) (magnitude z2))
+                      (sub (angle z1) (angle z2))))
   
   (put 'add '(complex complex) add-complex)
   (put 'sub '(complex complex) sub-complex)
@@ -370,6 +390,10 @@
 ; is enforced, but in apply-generic equ? could take any number of args
 (define (equ? x y) (apply-generic 'equ? x y))
 (define (=zero? x) (apply-generic '=zero? x))
+(define (sine x) (apply-generic 'sine x))
+(define (cosine x) (apply-generic 'cosine x))
+(define (square-root x) (apply-generic 'square-root x))
+(define (arctan y x) (apply-generic 'arctan y x))
 
 (define (magnitude z) (apply-generic 'magnitude z))
 (define (angle z) (apply-generic 'angle z))
@@ -389,12 +413,16 @@
 
 (display "READY\n\n")
 
-(define z1 (make-complex-from-real-imag 1 0))
-(add z1 z1)
-(mul z1 z1)
-(add z1 (make-complex-from-real-imag 1 -1))
-(add 3 z1)
-(add 3 z1 (make-rational 4 5) 0.23)
-; (magnitude z)
-; (angle z)
-; (imag-part z)
+; To make this work:
+; - Each number package has to install functions for sine/cosine/arctan/square-root
+; - Complex numbers had to use generic mul/add/div/sub/sine/cosine/arctan/square-root funcs
+(define z1 (make-complex-from-real-imag (make-rational 3 4) 2))
+(define z2 (make-complex-from-real-imag 1 (make-rational 3 4)))
+(define z3 (add z1 z2))
+(define z4 (mul z1 z2))
+(real-part z4)
+(imag-part z4)
+(magnitude z3)
+(angle z3)
+;(angle z1)
+;(magnitude z1)
