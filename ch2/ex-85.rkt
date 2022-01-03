@@ -22,6 +22,9 @@
 (define (add-raise-func from to func)
   (hash-set! tower-conversions (cons from 'raise) (cons to func)))
 
+(define (add-project-func from to func)
+  (hash-set! tower-conversions (cons from 'project) (cons to func)))
+
 ; Returns a composed function that converts from->to if a
 ; chain of conversion functions exists
 ; Otherwise, this returns false.
@@ -42,6 +45,40 @@
           #f))))
   (iter from (lambda (x)  x)))
 
+(define (get-project-type-and-func from)
+  (hash-ref! tower-conversions (cons from 'project) #f))
+
+; Simplifies the value with the given type as far as possible
+; If it can't be simplified anymore, then it returns the original value
+; and type
+(define (drop tagged-value)
+  (let [(project (get-project-type-and-func (type-tag tagged-value)))]
+    (if project
+      (let [(project-func (cdr project))
+            (project-type (car project))]
+        
+        ; Find the raise function to convert from the projected type to the
+        ; type of the tagged value
+        (let [(raise-func (get-raise-func project-type (type-tag tagged-value)))
+              (projected (project-func (contents tagged-value)))]
+          ; (display 'DROP-inner) (newline)
+          ; (display (list tagged-value (raise-func projected))) (newline)
+          ; (display (equ? tagged-value (raise-func projected))) (newline)
+          ; (display 'DROPREADY) (newline)
+          (cond
+            [(not raise-func) (error "No raise func for projected? bad")]
+
+            ; If we are able to project then raise and retrieve the same value,
+            ; then try to drop the projected value again
+            [(equ? tagged-value (raise-func projected)) (drop projected)]
+
+            ; Otherwise, projecting then raising does not yield the same value
+            ; so we can't simplify the value anymore
+            [else tagged-value])))
+
+      ; No existing project function, so we cannot simplify the tagged value
+      tagged-value)))
+
 ; tags
 (define (attach-tag type-tag contents)
   (if (number? contents)
@@ -53,25 +90,32 @@
     [(pair? datum) (car datum)]
     [(integer? datum) 'integer]
     [(number? datum) 'real]
-    [else (error "Bad tagged datum: TYPE-TAG" datum)]))
+    [else #f]))
 
 (define (contents datum)
   (cond
+    [(not (type-tag datum)) (error "Bad tagged datum: CONTENTS" datum)]
     [(pair? datum) (cdr datum)]
     [(number? datum) datum]
-    [else (error "Bad tagged datum: CONTENTS" datum)]))
+    [else (error "Also bad datum? CONTENTS: " datum)]))
 
 (define (apply-generic op . args)
   ; I'll implement a different strategy for handling multiple arguments
   ; of different types
   ; Instead of trying to convert every argument to a single type, I'll just
   ; go left to right and convert as necessary
-
+  ;(display (list 'apply-generic op args)) (newline)
   (define (apply-bin-op-same-type type a1 a2)
     ;(display (list 'apply-bin-op-same-type (list type a1 a2)))
     (let [(proc (get op (list type type)))]
       (if proc
-        (proc a1 a2)
+        (let [(result (proc a1 a2))]
+
+          ; Only try to drop if it's typed 
+          ; if we're returning a bool or something else from this system, don't try to drop
+          (if (type-tag result)
+            (drop result)
+            result))
         (error "No method for these types" (list op type type)))))
 
   (define (convert-and-apply-bin-op a1 a2)
@@ -97,11 +141,15 @@
           (convert-and-apply-bin-op acc arg))))
       (car args)
       (cdr args)))
-  
+
   (define (apply-op-single-arg arg)
+    ;(display (list `apply-op-single-arg op arg)) (newline)
     (let [(proc (get op (list (type-tag arg))))]
       (if proc
-        (proc (contents arg))
+        (let [(result (proc (contents arg)))]
+          (if (type-tag result)
+            (drop result)
+            result))
         (error "No method found for this type" (list op (type-tag arg))))))
   
   ;(display (list 'apply-generic op args)) (newline)
@@ -135,7 +183,11 @@
 
   ; I guess reals are floats, so / will also return a float
   (put 'div '(real real) /)
-  (put 'equ? '(real real) =)
+
+  ; TODO inexact equality for reals with arbitrary threshold
+  (put 'equ? '(real real) 
+    (lambda (a b) (< (abs (- a b)) 0.0001)))
+
   (put '=zero? '(real) (lambda (x) (= x 0)))
   (put 'make 'real (lambda (x) x))
 
@@ -143,7 +195,6 @@
   (add-raise-func 'real 'complex (lambda (x) (make-complex-from-real-imag x 0)))
   'scheme-number)
 
-(install-scheme-number-package)
 
 (define (install-rational-package)
   (define (numer x) (car x))
@@ -151,13 +202,6 @@
   (define (make-rat n d)
     (let [(g (gcd n d))]
       (cons (/ n g) (/ d g))))
-  
-  ;(put-coercion 'scheme-number 'rational
-  ;  (lambda (x) (make-rational x 1)))
-
-  ; feels weird to be mixing my number system with builtins, but...
-  (add-raise-func 'rational 'real 
-    (lambda (r) (/ (numer r) (denom r))))
 
   (define (add-rat x y)
     (make-rat (+ (* (numer x) (denom y))
@@ -195,8 +239,18 @@
     (lambda (n d) (tag (make-rat n d))))
   (put 'equ? '(rational rational) equ-rat?)
   (put '=zero? '(rational) =zero?)
+
+  ; feels weird to be mixing my number system with builtins, but...
+  (add-raise-func 'rational 'real (lambda (r) (/ (numer r) (denom r))))
+
+  (add-project-func 'rational 'integer
+    (lambda (x) (round (/ (numer x) (denom x)))))
+
+  (add-project-func 'real 'rational
+    (lambda (x) (let [(rat (rationalize x 1/100))]
+      (make-rational (inexact->exact (numerator rat)) (inexact->exact (denominator x))))))
+
   'rational)
-(install-rational-package)
 
 (define (install-complex-package)
   (define (tag z) (attach-tag 'complex z))
@@ -211,6 +265,8 @@
 
   ; (put-coercion 'scheme-number 'complex
   ;   (lambda (x) (make-complex-from-real-imag x 0)))
+
+  (add-project-func 'complex 'real internal-real-part)
   
   (put 'real-part '(complex) internal-real-part)
   (put 'imag-part '(complex) internal-imag-part)
@@ -229,7 +285,6 @@
   (put 'make-from-mag-ang 'complex
     (lambda (r a) (tag (internal-make-from-mag-ang r a))))
   'complex)
-(install-complex-package)
 
 (define (add . args) (apply apply-generic 'add args))
 (define (sub . args) (apply apply-generic 'sub args))
@@ -246,8 +301,9 @@
 (define (real-part z) (apply-generic 'real-part z))
 (define (imag-part z) (apply-generic 'imag-part z))
 
-(define (make-scheme-number x)
-  ((get 'make 'scheme-number) x))
+; (define (make-scheme-number x)
+;   (drop ((get 'make 'scheme-number) x)))
+
 (define (make-rational n d)
   ((get 'make 'rational) n d))
 (define (make-complex-from-real-imag x y)
@@ -255,29 +311,24 @@
 (define (make-complex-from-mag-ang r a)
   ((get 'make-from-mag-ang 'complex) r a))
 
-(define f (get-raise-func 'integer 'complex))
-(f 3)
-(add 3.2 (make-rational 3 4))
-(add 2 (make-rational 3 4))
-(add 2 (make-complex-from-real-imag 3 1))
+(install-scheme-number-package)
+(install-rational-package)
+(install-complex-package)
 
-; The only thing you should need to do if you want to add new levels to the tower
-; is to add a conversion functoin using add-raise-func
-(add 3 4 (make-rational 3 4) 3.21 (make-complex-from-real-imag 3 1))
-(sub 10 4 (make-rational 3 4) 3.21 (make-complex-from-real-imag 3 1))
-(mul 3 4 (make-rational 3 4) 3.21 (make-complex-from-real-imag 3 1))
-(equ? 3 (make-rational 9 3))
-(equ? (make-complex-from-real-imag 3 0) (make-rational 12 4))
-(equ? (make-complex-from-real-imag 3 1) (make-rational 12 4))
-(equ? 3 (make-rational 9 4))
-(div 4 5)
-(div 8 2)
-(div 1.23 3.45)
- 
-; I'm not really sure how this should work?
-; scheme returns a rational numer (4/5) from (/ 4 5)
-; which is apparently != 0.8
-; I could force everything to be inexact (using exact->inexact)
-; but I'm not sure that's right?
-; (equ? (make-rational 4 5) 0.8)
-; (= (/ 4 5) 0.8)
+(display "READY\n\n")
+
+(drop 3)
+(drop (make-rational 3 1))
+(drop (make-rational 3 2))
+(drop (make-complex-from-real-imag 3 0))
+(drop (make-complex-from-real-imag 3 1))
+(drop 3.5)
+
+
+(add (make-rational 3 1) (make-complex-from-real-imag 3 0))
+(sub (make-complex-from-real-imag 2 3) (make-complex-from-real-imag 15 3))
+(add (make-rational 1 2) (make-rational 1 2))
+
+; TODO this is having problems due to finding equality to inexact numbers
+; and conversions to/from polar, I think
+(mul (make-complex-from-real-imag 0 1) (make-complex-from-real-imag 0 1))
