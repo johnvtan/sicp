@@ -377,6 +377,89 @@
   (add-project-func 'complex 'real real-part)
   'complex)
 
+(define (install-polynomial-package)
+  (define (make-poly variable term-list) (cons variable term-list))
+  (define (variable p) (car p))
+  (define (term-list p) (cdr p))
+
+  (define variable? symbol?)
+  (define (same-variable? v1 v2)
+    (and (variable? v1) (variable? v2) (eq? v1 v2)))
+
+  (define empty-termlist? null?)
+  (define (the-empty-termlist) '())
+
+  (define (first-term term-list) (car term-list))
+  (define (rest-terms term-list) (cdr term-list))
+
+  (define (make-term order coeff) (list order coeff))
+  (define (order term) (car term))
+  (define (coeff term) (cadr term))
+
+  (define (adjoin-term term term-list)
+    (if (=zero? (coeff term))
+      term-list
+      (cons term term-list)))
+
+  (define (add-terms L1 L2)
+    (cond
+      [(empty-termlist? L1) L2]
+      [(empty-termlist? L2) L1]
+      [else
+        (let [(t1 (first-term L1))
+              (t2 (first-term L2))]
+          (cond
+            [(> (order t1) (order t2)) 
+              (adjoin-term t1 (add-terms (rest-terms L1) L2))]
+            [(< (order t1) (order t2))
+              (adjoin-term t2 (add-terms L1 (rest-terms L2)))]
+            [else
+              (adjoin-term
+                (make-term (order t1) (add (coeff t1) (coeff t2)))
+                (add-terms (rest-terms L1) (rest-terms L2)))]))]))
+  
+  (define (mul-term-by-all-terms t1 L)
+    (if (empty-termlist? L)
+      (the-empty-termlist)
+      (let [(t2 (first-term L))]
+        (adjoin-term
+          (make-term (+ (order t1) (order t2))
+                     (mul (coeff t1) (coeff t2)))
+          (mul-term-by-all-terms t1 (rest-terms L))))))
+
+  (define (mul-terms L1 L2)
+    (if (empty-termlist? L1)
+      (the-empty-termlist)
+      (add-terms (mul-term-by-all-terms (first-term L1) L2)
+                 (mul-terms (rest-terms L1) L2))))
+
+  (define (add-poly p1 p2)
+    (if (same-variable? (variable p1) (variable p2))
+      (make-poly (variable p1)
+                 (add-terms (term-list p1) (term-list p2)))
+      (error "polys not in same var: ADD-POLY" (list p1 p2))))
+
+  (define (mul-poly p1 p2)
+    (if (same-variable? (variable p1) (variable p2))
+      (make-poly (variable p1)
+                 (mul-terms (term-list p1) (term-list p2)))
+      (error "Polys not in same var: MUL-POLY" (list p1 p2))))
+  
+  (define (poly-is-zero p)
+    (define (all-terms-are-zero terms)
+      (cond
+        [(null? terms) #t]
+        [(=zero? (coeff (first-term terms))) (all-terms-are-zero (rest-terms terms))]
+        [else #f]))
+    (all-terms-are-zero (term-list p)))
+    
+  (define (tag p) (attach-tag 'polynomial p))
+  (put 'add '(polynomial polynomial) (lambda (p1 p2) (tag (add-poly p1 p2))))
+  (put 'mul '(polynomial polynomial) (lambda (p1 p2) (tag (mul-poly p1 p2))))
+  (put '=zero? '(polynomial) poly-is-zero)
+  (put 'make 'polynomial (lambda (var terms) (tag (make-poly var terms))))
+  'polynomial)
+
 (define (add . args) (apply apply-generic 'add args))
 (define (sub . args) (apply apply-generic 'sub args))
 (define (mul . args) (apply apply-generic 'mul args))
@@ -402,23 +485,26 @@
   ((get 'make-from-real-imag 'complex) x y))
 (define (make-complex-from-mag-ang r a)
   ((get 'make-from-mag-ang 'complex) r a))
+(define (make-poly var terms)
+  ((get 'make 'polynomial) var terms))
 
 (install-scheme-number-package)
 (install-rational-package)
 (install-complex-package)
+(install-polynomial-package)
 
 (display "READY\n\n")
 
-; To make this work:
-; - Each number package has to install functions for sine/cosine/arctan/square-root
-; - Complex numbers had to use generic mul/add/div/sub/sine/cosine/arctan/square-root funcs
-(define z1 (make-complex-from-real-imag (make-rational 3 4) 2))
-(define z2 (make-complex-from-real-imag 1 (make-rational 3 4)))
-(define z3 (add z1 z2))
-(define z4 (mul z1 z2))
-(real-part z4)
-(imag-part z4)
-(magnitude z3)
-(angle z3)
-;(angle z1)
-;(magnitude z1)
+(define p-not-zero (make-poly 'x (list (list 1 1) (list 2 0))))
+(=zero? p-not-zero)
+
+(define p-zero (make-poly 'x (list (list 2 (make-complex-from-real-imag 0 0)) 
+                                   (list 1 (make-rational 0 1))
+                                   (list 0 0))))
+(=zero? p-zero)
+(define nested-p (make-poly 'y (list (list 2 p-zero) (list 1 (make-rational 0 2)))))
+(=zero? nested-p)
+
+(define nested-p2 (make-poly 'y (list (list 2 p-not-zero) (list 1 (make-rational 1 2)))))
+(=zero? nested-p2)
+(add nested-p2 nested-p) ; should just be nested p
