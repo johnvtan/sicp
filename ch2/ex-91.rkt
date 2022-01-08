@@ -38,7 +38,7 @@
         (if from-tower
           (let [(next-type (car from-tower))
                 (raise-func (cdr from-tower))]
-            (iter next-type (lambda (x)
+            (iter next-type (lambda (x) 
               (raise-func (contents (acc x))))))
           #f))))
   (iter from (lambda (x)  x)))
@@ -54,7 +54,7 @@
     (if project
       (let [(project-func (cdr project))
             (project-type (car project))]
-
+        
         ; Find the raise function to convert from the projected type to the
         ; type of the tagged value
         (let [(raise-func (get-raise-func project-type (type-tag tagged-value)))
@@ -105,7 +105,7 @@
       (if proc
         (let [(result (proc a1 a2))]
 
-          ; Only try to drop if it's typed
+          ; Only try to drop if it's typed 
           ; if we're returning a bool or something else from this system, don't try to drop
           (if (type-tag result)
             (drop result)
@@ -145,13 +145,13 @@
             (drop result)
             result))
         (error "No method found for this type" (list op (type-tag arg))))))
-
+  
   ;(display (list 'apply-generic op args)) (newline)
   (cond
     [(null? args) (error "No 0-argument methods implemented" (list op))]
     [(null? (cdr args)) (apply-op-single-arg (car args))]
     [else (apply-op-multiple-args args)]))
-
+     
 (define (install-scheme-number-package)
   (put 'add '(integer integer) +)
   (put 'sub '(integer integer) -)
@@ -189,7 +189,7 @@
   (put 'neg '(real) -)
 
   ; TODO inexact equality for reals with arbitrary threshold
-  (put 'equ? '(real real)
+  (put 'equ? '(real real) 
     (lambda (a b) (< (abs (- a b)) 0.0001)))
 
   (put '=zero? '(real) (lambda (x) (= x 0)))
@@ -223,12 +223,12 @@
   (define (div-rat x y)
     (make-rat (mul (numer x) (denom y))
               (mul (denom x) (numer y))))
-
+  
   ; assuming they are all reduced
   (define (equ-rat? x y)
     (and (eq? (numer x) (numer y))
          (eq? (denom x) (denom y))))
-
+  
   (define (=zero? x)
     (= (numer x) 0))
 
@@ -283,7 +283,7 @@
       (arctan (imag-part z) (real-part z)))
     (define (make-from-mag-ang r a)
       (list (mul r (cosine a)) (mul r (sine a))))
-
+    
     (define (tag x) (attach-tag 'rectangular x))
     (put 'real-part '(rectangular) real-part)
     (put 'imag-part '(rectangular) imag-part)
@@ -304,12 +304,12 @@
     (define (make-from-mag-ang r a) (list r a))
 
     (define (real-part z) (mul (magnitude z) (cos (angle z))))
-    (define (imag-part z)
+    (define (imag-part z) 
       (mul (magnitude z) (sin (angle z))))
     (define (make-from-real-imag x y)
       (list (square-root (add (square x) (square y)))
             (arctan y x)))
-
+    
     (define (tag x) (attach-tag 'polar x))
     (put 'real-part '(polar) real-part)
     (put 'imag-part '(polar) imag-part)
@@ -336,20 +336,20 @@
   ; Then the function in op-table that maps to ('real-part . '(complex))
   ; will be given an argument that has the the contents of z with the
   ; type tag stripped off, e.g. (rectangular (a . b))
-  ;
+  ; 
   ; So then to call the correct real-part function installed by
   ; the install-rectangular-package function, we need to call
-  ; apply-generic **again** so that we lookup the real-part
+  ; apply-generic **again** so that we lookup the real-part 
   ; in the op-table that takes a "rectangular", and pass to it
   ; the contents of the rectangular number, e.g. (a . b)
   (define (apply-generic-again op)
     (lambda (x) (apply-generic op x)))
-
+  
   (put 'real-part '(complex) (apply-generic-again 'real-part))
   (put 'imag-part '(complex) (apply-generic-again 'imag-part))
   (put 'magnitude '(complex) (apply-generic-again 'magnitude))
   (put 'angle '(complex) (apply-generic-again 'angle))
-
+  
   (put 'equ? '(complex complex)
     (lambda (z1 z2) (and (eq? (real-part z1) (real-part z2))
                          (eq? (imag-part z1) (imag-part z2)))))
@@ -369,15 +369,15 @@
   (define (div-complex z1 z2)
     (make-complex-from-mag-ang (div (magnitude z1) (magnitude z2))
                       (sub (angle z1) (angle z2))))
-
+  
   (put 'add '(complex complex) add-complex)
   (put 'sub '(complex complex) sub-complex)
   (put 'mul '(complex complex) mul-complex)
   (put 'div '(complex complex) div-complex)
-
+    
   (put '=zero? '(complex)
     (lambda (z) (= (magnitude z) 0)))
-
+  
   (put 'neg '(complex) (lambda (z)
     (tag ((apply-generic-again 'neg) z))))
 
@@ -391,108 +391,28 @@
   'complex)
 
 (define (install-polynomial-package)
-
-  ; Functions shared between packages
-  (define (make-poly var termlist) (cons var termlist))
+  (define (make-poly variable term-list) (cons variable term-list))
   (define (variable p) (car p))
   (define (term-list p) (cdr p))
+
   (define variable? symbol?)
   (define (same-variable? v1 v2)
     (and (variable? v1) (variable? v2) (eq? v1 v2)))
+
+  (define empty-termlist? null?)
+  (define (the-empty-termlist) '())
+
+  (define (first-term term-list) (car term-list))
+  (define (rest-terms term-list) (cdr term-list))
 
   (define (make-term order coeff) (list order coeff))
   (define (order term) (car term))
   (define (coeff term) (cadr term))
 
-  ; These are types for the term-list
-  ; term-list is now a tagged type
-  (define (install-dense)
-    ; TODO do these have to be generic too?
-    (define (empty-termlist? t) (null? t))
-    (define (the-empty-termlist) '())
-    (define (make-term-list t) t)
-
-    ; Only tag terms when they are separated from the rest of the list
-    (define (first-term term-list)
-      (let [(first-term-in-list (car term-list))]
-        (make-term (car first-term-in-list) (cadr first-term-in-list))))
-
-    (define (rest-terms term-list) (cdr term-list))
-
-    ; Do I have to tag terms too?
-    (define (adjoin-term term term-list)
-      ;(display (list 'adjoin-term term-list)) (newline)
-      (if (=zero? (coeff term))
-        term-list
-        (cons term term-list)))
-
-    (define (tag x) (attach-tag 'dense x))
-    (put 'first-term '(dense) first-term)
-    (put 'rest-terms '(dense) (lambda (x) (tag (rest-terms x))))
-    (put 'adjoin-term 'dense (lambda (term termlist) (tag (adjoin-term term termlist))))
-    (put 'make-termlist 'dense (lambda (term-list) (tag (make-term-list term-list))))
-    (put 'empty-termlist? '(dense) empty-termlist?)
-    (put 'the-empty-termlist 'dense (lambda () (tag (the-empty-termlist))))
-    'dense)
-
-  (define (install-sparse)
-    (define (empty-termlist? t) (= -1 (order t)))
-    (define (the-empty-termlist) (make-term-list -1 '()))
-
-    (define (make-term-list order t) (list order t))
-    (define (term-list-order t) (car t))
-    (define (term-list-coeffs t) (cadr t))
-
-    (define (first-term term-list)
-      (make-term (term-list-order term-list) (car (term-list-coeffs term-list))))
-
-    (define (rest-terms term-list)
-      (list (- (term-list-order term-list) 1) (cdr (term-list-coeffs term-list))))
-
-    (define (adjoin-term term term-list)
-      (define (fill-out-term-list-to-nth-order n t)
-        (if (= n (term-list-order t))
-          t
-          (fill-out-term-list-to-nth-order n
-            (make-term-list (+ (term-list-order t) 1)
-                            (cons 0 (term-list-coeffs t))))))
-      (cond
-        ; TODO replace with =zero? later
-        [(= (coeff term) 0) term-list]
-
-        ; TODO allow adjoing if coeff in term-list is 0?
-        [(<= (order term) (term-list-order term-list))
-          (error "Cannot adjoin term to term-list since the order already exists" term term-list)]
-        [else
-          (let [(new-term-list (fill-out-term-list-to-nth-order (- (order term) 1) term-list))]
-            (make-term-list (order term) (cons (coeff term) (term-list-coeffs new-term-list))))]))
-
-    (define (tag x) (attach-tag 'sparse x))
-    (put 'first-term '(sparse) first-term)
-    (put 'rest-terms '(sparse) (lambda (x) (tag (rest-terms x))))
-    (put 'adjoin-term 'sparse (lambda (term termlist) (tag (adjoin-term term termlist))))
-    (put 'make-termlist 'sparse (lambda (term-list) (tag (make-term-list (- (length term-list) 1) term-list))))
-    (put 'empty-termlist? '(sparse) empty-termlist?)
-    (put 'the-empty-termlist 'sparse (lambda () (tag (the-empty-termlist))))
-    'sparse)
-
-  (install-dense)
-  (install-sparse)
-
-  (define (the-empty-termlist tag)
-    ((get 'the-empty-termlist tag)))
-
-  (define (empty-termlist? t)
-    (apply-generic 'empty-termlist? t))
-
-  (define (first-term termlist)
-    (apply-generic 'first-term termlist))
-
-  (define (rest-terms termlist)
-    (apply-generic 'rest-terms termlist))
-
-  (define (adjoin-term term termlist)
-    ((get 'adjoin-term (type-tag termlist)) term (contents termlist)))
+  (define (adjoin-term term term-list)
+    (if (=zero? (coeff term))
+      term-list
+      (cons term term-list)))
 
   (define (add-terms L1 L2)
     (cond
@@ -502,7 +422,7 @@
         (let [(t1 (first-term L1))
               (t2 (first-term L2))]
           (cond
-            [(> (order t1) (order t2))
+            [(> (order t1) (order t2)) 
               (adjoin-term t1 (add-terms (rest-terms L1) L2))]
             [(< (order t1) (order t2))
               (adjoin-term t2 (add-terms L1 (rest-terms L2)))]
@@ -510,10 +430,10 @@
               (adjoin-term
                 (make-term (order t1) (add (coeff t1) (coeff t2)))
                 (add-terms (rest-terms L1) (rest-terms L2)))]))]))
-
+  
   (define (mul-term-by-all-terms t1 L)
     (if (empty-termlist? L)
-      (the-empty-termlist (type-tag L))
+      (the-empty-termlist)
       (let [(t2 (first-term L))]
         (adjoin-term
           (make-term (+ (order t1) (order t2))
@@ -522,9 +442,34 @@
 
   (define (mul-terms L1 L2)
     (if (empty-termlist? L1)
-      (the-empty-termlist (type-tag L1))
+      (the-empty-termlist)
       (add-terms (mul-term-by-all-terms (first-term L1) L2)
                  (mul-terms (rest-terms L1) L2))))
+
+  (define (neg-terms terms)
+    (cond
+      [(empty-termlist? terms) (the-empty-termlist)]
+      [else 
+        (let ([curr (first-term terms)])
+          (cons (make-term (order curr) (neg (coeff curr)))
+                (neg-terms (rest-terms terms))))]))
+  
+  (define (div-terms L1 L2) 
+    (if (empty-termlist? L1)
+      (list (the-empty-termlist) (the-empty-termlist))
+      (let [(t1 (first-term L1))
+            (t2 (first-term L2))]
+        (if (> (order t2) (order t1))
+          (list (the-empty-termlist) L1)
+          (let [(new-c (div (coeff t1) (coeff t2)))
+                (new-o (- (order t1) (order t2)))]
+            (let [(new-term (make-term new-o new-c))]
+              (let [(mult (mul-terms L2 (list new-term)))]
+                (let [(diff (add-terms L1 (neg-terms mult)))]
+                  (let [(rest-of-result (div-terms diff L2))]
+                    (list
+                      (cons new-term (car rest-of-result))
+                      (cadr rest-of-result)))))))))))
 
   (define (add-poly p1 p2)
     (if (same-variable? (variable p1) (variable p2))
@@ -537,30 +482,36 @@
       (make-poly (variable p1)
                  (mul-terms (term-list p1) (term-list p2)))
       (error "Polys not in same var: MUL-POLY" (list p1 p2))))
-
+  
   (define (poly-is-zero p)
     (define (all-terms-are-zero terms)
       (cond
-        [(empty-termlist? terms) #t]
+        [(null? terms) #t]
         [(=zero? (coeff (first-term terms))) (all-terms-are-zero (rest-terms terms))]
         [else #f]))
     (all-terms-are-zero (term-list p)))
 
   (define (neg-poly p)
-    (define (negate-all-terms terms)
-      ;(display (list 'negate terms)) (newline)
-      (cond
-        [(empty-termlist? terms) (the-empty-termlist (type-tag terms))]
-        [else
-          (let ([curr (first-term terms)])
-            (adjoin-term (make-term (order curr) (neg (coeff curr)))
-                  (negate-all-terms (rest-terms terms))))]))
-    (make-poly (variable p) (negate-all-terms (term-list p))))
-
+     (make-poly (variable p) (neg-terms (term-list p))))
+  
+  (define (div-poly p1 p2)
+    (if (same-variable? (variable p1) (variable p2))
+      (let [(div-result (div-terms (term-list p1) (term-list p2)))]
+        (list
+          (make-poly (variable p1) (car div-result))
+          (make-poly (variable p1) (cadr div-result))))
+      (error "Polys not in same var: DIV-POLY" (list p1 p2))))
+    
   (define (tag p) (attach-tag 'polynomial p))
   (put 'add '(polynomial polynomial) (lambda (p1 p2) (tag (add-poly p1 p2))))
   (put 'mul '(polynomial polynomial) (lambda (p1 p2) (tag (mul-poly p1 p2))))
   (put 'sub '(polynomial polynomial) (lambda (p1 p2) (tag (add-poly p1 (neg-poly p2)))))
+  (put 'div '(polynomial polynomial) 
+    (lambda (p1 p2)
+      (let [(div-result (div-poly p1 p2))]
+        (list
+          (tag (car div-result))
+          (tag (cadr div-result))))))
 
   (put '=zero? '(polynomial) poly-is-zero)
   (put 'neg '(polynomial) (lambda (p) (tag (neg-poly p))))
@@ -596,10 +547,6 @@
   ((get 'make-from-mag-ang 'complex) r a))
 (define (make-poly var terms)
   ((get 'make 'polynomial) var terms))
-(define (make-dense-termlist terms)
-  ((get 'make-termlist 'dense) terms))
-(define (make-sparse-termlist terms)
-  ((get 'make-termlist 'sparse) terms))
 
 (install-scheme-number-package)
 (install-rational-package)
@@ -607,13 +554,10 @@
 (install-polynomial-package)
 
 (display "READY\n\n")
-(define p1 (make-poly 'x (make-dense-termlist (list (list 2 (make-complex-from-real-imag 1 1)) (list 1 (make-rational 3 4)) (list 0 4)))))
-;(neg p1)
-(=zero? (sub p1 p1))
-(define p2 (make-poly 'x (make-dense-termlist (list (list 2 (make-complex-from-real-imag 1 1)) (list 0 4)))))
-(sub p1 p2)
 
-(define p3 (make-poly 'x (make-sparse-termlist (list 2 1 3 0 4))))
-(sub p3 p3)
-(add p3 p3)
-(add p3 (sub p3 p3))
+(define p1 (make-poly 'x '((2 1) (1 2) (0 1))))
+(div p1 p1)
+
+(define p2 (make-poly 'x '((1 1) (0 1))))
+(div p1 p2)
+(div p2 p1)
