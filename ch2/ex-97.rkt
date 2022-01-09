@@ -99,7 +99,7 @@
   ; of different types
   ; Instead of trying to convert every argument to a single type, I'll just
   ; go left to right and convert as necessary
-  ; (display (list 'apply-generic op args)) (newline)
+  ;(display (list 'apply-generic op args)) (newline)
   (define (apply-bin-op-same-type type a1 a2)
     ; (display (list 'apply-bin-op-same-type (list type a1 a2))) (newline)
     (let [(proc (get op (list type type)))]
@@ -165,7 +165,7 @@
         ; I wonder how bad it is to compute the remainder here
         ; should I just do the division and throw it away if
         ; we need to make a rational?
-        [(and (> (abs x) (abs y)) (= (remainder x y) 0)) (/ x y)]
+        [(and (>= (abs x) (abs y)) (= (remainder x y) 0)) (/ x y)]
         [else (make-rational x y)])))
   (put 'sine '(integer) sin)
   (put 'cosine '(integer) cos)
@@ -173,15 +173,15 @@
   (put 'arctan '(integer integer) atan)
   (put 'neg '(integer) -)
 
-  (define (gcd a b)
-    (if (= b 0)
-      a
-      (gcd b (remainder a b))))
-
   (put 'equ? '(integer integer) =)
   (put '=zero? '(integer) (lambda (x) (= x 0)))
   (put 'greatest-common-divisor '(integer) gcd)
   (put 'make 'integer (lambda (x) x))
+
+  (put 'reduce '(integer integer)
+    (lambda (n d)
+      (let [(g (gcd n d))]
+        (list (/ n g) (/ d g)))))
 
   (put 'add '(real real) +)
   (put 'sub '(real real) -)
@@ -213,7 +213,7 @@
   ; gcd will not work with non-reals/integers
   ; rationals get messed up if we let complex numbers as numer/denoms
   (define (make-rat n d)
-    (list n d))
+    (reduce n d))
 
   (define (add-rat x y)
     (make-rat (add (mul (numer x) (denom y))
@@ -268,8 +268,8 @@
     (lambda (y x) (atan (raise-to-real y) (raise-to-real x))))
 
   ; these don't really hold anymore
-  (add-project-func 'rational 'integer
-    (lambda (x) (round (/ (numer x) (denom x)))))
+  ; (add-project-func 'rational 'integer
+  ;   (lambda (x) (round (/ (numer x) (denom x)))))
 
   (add-project-func 'real 'rational
     (lambda (x) (let [(rat (rationalize x 1/100))]
@@ -471,7 +471,7 @@
           #f)]))
   
   (define (div-terms L1 L2) 
-    (display (list 'div-terms L1 L2)) (newline)
+    ;(display (list 'div-terms L1 L2)) (newline)
     (if (empty-termlist? L1)
       (list (the-empty-termlist) (the-empty-termlist))
       (let [(t1 (first-term L1))
@@ -480,17 +480,16 @@
           (list (the-empty-termlist) L1)
           (let [(new-c (div (coeff t1) (coeff t2)))
                 (new-o (- (order t1) (order t2)))]
-            (display (list 'new-c t1 '/ t2 '= new-c)) (newline)
+            ;(display (list 'new-c t1 '/ t2 '= new-c)) (newline)
             (let [(new-term (make-term new-o new-c))]
               (let [(mult (mul-terms L2 (list new-term)))]
-                (display (list 'mult mult)) (newline)
+                ;(display (list 'mult mult)) (newline)
                 (let [(diff (add-terms L1 (neg-terms mult)))]
-                  (display (list 'diff diff)) (newline)
+                  ;(display (list 'diff diff)) (newline)
                   (let [(rest-of-result (div-terms diff L2))]
                     (list
                       (cons new-term (car rest-of-result))
                       (cadr rest-of-result)))))))))))
-
 
   (define (add-poly p1 p2)
     (if (same-variable? (variable p1) (variable p2))
@@ -530,13 +529,16 @@
   
   (define (remainder-terms a b)
     (cadr (div-terms a b)))
+  
+  (define (quotient-terms a b)
+    (car (div-terms a b)))
  
   (define (psuedoremainder-terms p q)
     (let [(t1 (first-term p)) (t2 (first-term q))]
       (let [(integrizing-factor (expt (coeff t2) (+ 1 (order t1) (- (order t2)))))]
-        (display (list 'integrizing integrizing-factor)) (newline)
+        ;(display (list 'integrizing integrizing-factor)) (newline)
         (let [(mult (mul-term-by-all-terms (make-term 0 integrizing-factor) p))]
-          (display (list 'ps mult)) (newline)
+          ;(display (list 'ps mult)) (newline)
           (remainder-terms mult q)))))
  
   (define (gcd-terms a b)
@@ -549,11 +551,41 @@
     (if (same-variable? (variable a) (variable b))
       (make-poly (variable a) (gcd-terms (term-list a) (term-list b)))
       (error "Polys not in same var: GCD-POLY" (list a b))))
-    
+
+  (define (reduce-terms n d)
+    (let [(poly-gcd (gcd-terms n d))] 
+      (let [(factor (expt 
+                      (coeff (first-term poly-gcd)) 
+                      (+ 1 (max (order (first-term n)) (order (first-term d)))
+                           (- (order (first-term poly-gcd))))))]
+        (let [(ni (mul-term-by-all-terms (make-term 0 factor) n))
+              (di (mul-term-by-all-terms (make-term 0 factor) d))]
+          (let [(nn (quotient-terms ni poly-gcd))
+                (dd (quotient-terms di poly-gcd))]
+            (let [(coeff-gcd (apply gcd (append (map coeff nn) (map coeff dd))))]
+              (list
+                (map (lambda (t) (make-term (order t) (/ (coeff t) coeff-gcd))) nn)
+                (map (lambda (t) (make-term (order t) (/ (coeff t) coeff-gcd))) dd))))))))
+  
+  (define (reduce-poly p1 p2)
+    (if (same-variable? (variable p1) (variable p2))
+      (let [(reduced-terms (reduce-terms (term-list p1) (term-list p2)))]
+        (list
+          (make-poly (variable p1) (car reduced-terms))
+          (make-poly (variable p1) (cadr reduced-terms))))
+      (error "polys not in same var: REDUCE-POLY" (list p1 p2))))
+
   (define (tag p) (attach-tag 'polynomial p))
   (put 'add '(polynomial polynomial) (lambda (p1 p2) (tag (add-poly p1 p2))))
   (put 'mul '(polynomial polynomial) (lambda (p1 p2) (tag (mul-poly p1 p2))))
   (put 'sub '(polynomial polynomial) (lambda (p1 p2) (tag (add-poly p1 (neg-poly p2)))))
+  (put 'reduce '(polynomial polynomial)
+    (lambda (p1 p2)
+      (let [(rp (reduce-poly p1 p2))]
+        (list
+          (tag (car rp))
+          (tag (cadr rp))))))
+
   (put 'greatest-common-divisor '(polynomial polynomial)
     (lambda (p1 p2)
       (tag (gcd-poly p1 p2))))
@@ -581,6 +613,7 @@
 (define (=zero? x) (apply-generic '=zero? x))
 (define (neg x) (apply-generic 'neg x))
 (define (greatest-common-divisor a b) (apply-generic 'greatest-common-divisor a b))
+(define (reduce a b) (apply-generic 'reduce a b))
 
 (define (sine x) (apply-generic 'sine x))
 (define (cosine x) (apply-generic 'cosine x))
@@ -608,11 +641,19 @@
 
 (display "READY\n\n")
 
-(define p1 (make-poly 'x '((2 1) (1 -2) (0 1))))
-(define p2 (make-poly 'x '((2 11) (0 7))))
-(define p3 (make-poly 'x '((1 13) (0 5))))
+(make-rational 4 6)
+(make-rational 10 20)
+(make-rational 5 6)
 
-(define q1 (mul p1 p2))
-(define q2 (mul p1 p3))
+(define p1 (make-poly 'x '((1 1) (0 1))))
+(define p2 (make-poly 'x '((3 1) (0 -1))))
+(define p3 (make-poly 'x '((1 1))))
+(define p4 (make-poly 'x '((2 1) (0 -1))))
+(define rf1 (make-rational p1 p2))
+rf1
+(define rf2 (make-rational p3 p4))
+rf2
 
-(greatest-common-divisor q1 q2)
+; I don't know why this happened, but all my signs are flipped
+; from the way I expect but technically it's correct lol
+(add rf1 rf2)
