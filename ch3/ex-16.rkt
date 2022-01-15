@@ -17,9 +17,9 @@
 (define lst (cons y y))
 (count-pairs (list lst))
 
-(count-pairs (cons lst lst))
+(define lst2 (cons lst lst))
+(count-pairs lst2)
 
-(define z '(a b c))
-(cdr (cdr z))
-;(set-cdr! (cddr z) z)
-;(count-pairs z) ; never returns
+(define z '(a b))
+(set-cdr! (cdr z) z)
+(count-pairs z) ; never returns
