@@ -6,15 +6,6 @@
 (#%require "circuits/gates.rkt")
 (#%require "circuits/agenda.rkt")
 
-(define (probe name wire)
-  (add-action! wire
-               (lambda ()
-                (newline)
-                (display name) (display " ")
-                (display (current-time the-agenda))
-                (display " New-value = ") (display (get-signal wire))
-                (newline))))
-
 (define input-1 (make-wire))
 (define input-2 (make-wire))
 (define sum (make-wire))
