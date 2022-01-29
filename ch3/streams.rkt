@@ -46,5 +46,18 @@
 (define integers
   (cons-stream 1 (stream-map + ones integers)))
 
+(define (interleave s1 s2)
+  (if (stream-null? s1)
+    s2
+    (cons-stream (stream-car s1)
+                 (interleave s2 (stream-cdr s1)))))
+
+(define (pairs s t)
+  (cons-stream
+    (list (stream-car s) (stream-car t))
+    (interleave
+      (stream-map (lambda (x) (list (stream-car s) x)) (stream-cdr t))
+      (pairs (stream-cdr s) (stream-cdr t)))))
+
 (#%provide stream-car stream-cdr list->stream stream->list stream-map stream-enumerate-interval
-  stream-filter stream-ref scale-stream ones integers)
+  stream-filter stream-ref scale-stream ones integers interleave pairs)
