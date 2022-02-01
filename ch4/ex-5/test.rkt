@@ -88,23 +88,13 @@
         (fact 5)))
   120)
 
-; let's
+; new cond
 (assert-eq
   (eval-with-env
-    '(let [(x 3) (y 4)]
-      (+ x y)))
-  7)
-
-(assert-eq
-  (eval-with-env
-    '(begin
-      (define outer 42)
-      (define x 32)
-      (let [(x 1000)]
-        (let [(y 23)]
-          (+ outer x y)))))
-  (+ 1000 23 42))
-
+    '(cond
+        [(assoc 'b '((a 1) (b 2))) => (lambda (x) (car (cdr x)))]
+        [else false]))
+  2)
 
 (display "TESTS PASS") (newline)
 

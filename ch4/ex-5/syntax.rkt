@@ -93,6 +93,7 @@
   (eq? (cond-predicate clause) 'else))
 (define (cond-predicate clause) (car clause))
 (define (cond-actions clause) (cdr clause))
+(define (cond-recipient clause) (caddr clause))
 (define (cond->if exp) (expand-clauses (cond-clauses exp)))
 
 (define (expand-clauses clauses)
@@ -105,8 +106,13 @@
           (sequence->exp (cond-actions first))
           (error "ELSE clauses isn't last: COND->IF" clauses))
         (make-if (cond-predicate first)
-                 (sequence->exp (cond-actions first))
-                 (expand-clauses rest))))))
+                (if (memq '=> first)
+                  ; additional syntax -- if => is found, then create an
+                  ; application of the recipient procedure on the predicate
+                  ; note that this evaluates the predicate twice
+                  (list (cond-recipient first) (cond-predicate first))
+                  (sequence->exp (cond-actions first)))
+                (expand-clauses rest))))))
 
 
 (define (make-procedure parameters body env)
@@ -122,15 +128,6 @@
   (tagged-list? proc 'primitive))
 
 (define (primitive-implementation proc) (cadr proc))
-
-(define (let? exp) (tagged-list? exp 'let))
-(define (let-bindings exp) (cadr exp))
-(define (let-vars exp) (map car (let-bindings exp)))
-(define (let-vals exp) (map cadr (let-bindings exp)))
-(define (let-body exp) (cddr exp))
-(define (let->combination exp)
-  (cons (list 'lambda (let-vars exp) (sequence->exp (let-body exp)))
-    (let-vals exp)))
 
 (#%provide self-evaluating? variable?
   quoted? text-of-quotation
@@ -150,5 +147,4 @@
   application?
   primitive-procedure?
   compound-procedure?
-  primitive-implementation
-  let->combination let?)
+  primitive-implementation)

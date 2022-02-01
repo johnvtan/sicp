@@ -71,9 +71,6 @@
     ; Converts cond statements into ifs
     [(cond? exp) (myeval (cond->if exp) env)]
 
-    [(let? exp) 
-      (myeval (let->combination exp) env)]
-
     ; Note how the operator is also myevaluated
     ; This is how ((if x + -) 3 2) would be myevaluated
     [(application? exp)
