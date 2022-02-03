@@ -27,36 +27,31 @@
       (error "Too many arguments supplied" vars vals)
       (error "Too few arguments supplied" vars vals))))
 
+(define (scan-frame vars vals target-var proc-if-found proc-if-failed)
+  (cond
+    [(null? vars) (proc-if-failed)]
+    [(eq? target-var (car vars)) (proc-if-found vars vals)]
+    [else (scan-frame (cdr vars) (cdr vals) target-var proc-if-found proc-if-failed)]))
+
+(define (search-env env target-var proc-if-found)
+  (define (local-scan frame)
+    (scan-frame (frame-variables frame) (frame-values frame)
+      target-var proc-if-found
+      (lambda () (search-env (enclosing-environment env) target-var proc-if-found))))
+  (if (eq? env the-empty-environment)
+    (error "Unbound variable" target-var)
+    (local-scan (first-frame env))))
+
 ; Looking up a var in an environment involves looking at the variables
 ; in each frame in the environment successively until we reach the
 ; outermost environment.
 (define (lookup-variable-value var env)
-  (define (env-loop env)  
-    (define (scan vars vals)
-      (cond
-        [(null? vars) (env-loop (enclosing-environment env))]
-        [(eq? var (car vars)) (car vals)]
-        [else (scan (cdr vars) (cdr vals))]))
-    (if (eq? env the-empty-environment)
-      (error "Unbound variable" var)
-      (let [(frame (first-frame env))]
-        (scan (frame-variables frame) (frame-values frame)))))
-  (env-loop env))
+  (search-env env var (lambda (vars vals) (car vals))))
 
 ; Setting a variable is almost the same, except that we change
 ; the corresponding value when we find it
 (define (set-variable-value! var val env)
-  (define (env-loop env)  
-    (define (scan vars vals)
-      (cond
-        [(null? vars) (env-loop (enclosing-environment env))]
-        [(eq? var (car vars)) (set-car! vals val)]
-        [else (scan (cdr vars) (cdr vals))]))
-    (if (eq? env the-empty-environment)
-      (error "Unbound variable" var)
-      (let [(frame (first-frame env))]
-        (scan (frame-variables frame) (frame-values frame)))))
-  (env-loop env))
+  (search-env env var (lambda (vars vals) (set-car! vals val))))
 
 ; Defines a variable in the first frame of an environment
 ; If the variable already exists in the frame, the value is changed
@@ -64,12 +59,9 @@
 ; the first frame if one does not already exist.
 (define (define-variable! var val env)
   (let [(frame (first-frame env))]
-    (define (scan vars vals)
-      (cond
-        [(null? vars) (add-binding-to-frame! var val frame)]
-        [(eq? var (car vars)) (set-car! vars val)]
-        [else (scan (cdr vars) (cdr vals))]))
-    (scan (frame-variables frame) (frame-values frame))))
+    (scan-frame (frame-variables frame) (frame-values frame) var
+      (lambda (vars vals) (set-car! vars val))
+      (lambda () (add-binding-to-frame! var val frame)))))
 
 (define primitive-procedures
   (list (list 'car car)
