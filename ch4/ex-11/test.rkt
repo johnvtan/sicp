@@ -112,7 +112,6 @@
         (+ x 45))))
   48)
 
-
 (display "TESTS PASS") (newline)
 
 ; I don't feel like figuring out how to write a macro that catches exceptions
