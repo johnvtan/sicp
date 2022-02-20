@@ -45,7 +45,7 @@
                     env))
 
 (define (myeval exp env)
-  ;(display (list 'Evaluating exp (symbol? exp))) (newline)
+  ;(display (list 'Evaluating exp)) (newline)
   (cond
 
     ; Primitives?

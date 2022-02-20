@@ -72,7 +72,9 @@
         (list '- -)
         (list '* *)
         (list '/ /)
-        (list 'eq? eq?)))
+        (list 'eq? eq?)
+        (list '= =)
+        (list '< <)))
 
 (define (primitive-procedure-names)
   (map car primitive-procedures))

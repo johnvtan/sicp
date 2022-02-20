@@ -89,21 +89,21 @@
   120)
 
 ; let's
-;(assert-eq
-;  (eval-with-env
-;    '(let [(x 3) (y 4)]
-;      (+ x y)))
-;  7)
-;
-;(assert-eq
-;  (eval-with-env
-;    '(begin
-;      (define outer 42)
-;      (define x 32)
-;      (let [(x 1000)]
-;        (let [(y 23)]
-;          (+ outer x y)))))
-;  (+ 1000 23 42))
+(assert-eq
+  (eval-with-env
+    '(let [(x 3) (y 4)]
+      (+ x y)))
+  7)
+
+(assert-eq
+  (eval-with-env
+    '(begin
+      (define outer 42)
+      (define x 32)
+      (let [(x 1000)]
+        (let [(y 23)]
+          (+ outer x y)))))
+  (+ 1000 23 42))
 
 (assert-eq
   (eval-with-env
