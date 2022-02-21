@@ -29,7 +29,7 @@
   (cond
     [(last-exp? exps) (myeval (first-exp exps) env)]
     [else
-      (myeval (first-exp exps) env)
+      (actual-value (first-exp exps) env)
       (myeval-sequence (rest-exps exps) env)]))
 
 (define (myeval-assignment exp env)
@@ -129,9 +129,5 @@
     [(evaluated-thunk? obj) (thunk-value obj)]
     [else obj]))
 
-; (define (force-it obj)
-;   (if (thunk? obj)
-;     (actual-value (thunk-exp obj) (thunk-env obj))
-;     obj))
 
 (#%provide myeval myapply actual-value)

@@ -5,7 +5,6 @@
 (#%require "eval.rkt")
 (#%require "environment.rkt")
 (#%require "assert.rkt")
-(#%require "time.rkt")
 
 (define (eval-with-env expr)
   (actual-value expr (setup-environment)))
@@ -131,16 +130,49 @@
         (try 0 (/ 1 0))))
   1)
 
-(time
-  (eval-with-env
-    '(begin
-        (define (fib n)
-          (if (< n 2)
-            1
-            (+ (fib (- n 1)) (fib (- n 2)))))
-        (fib 30))))
-; no memo -> 12127 ms
-; with memo -> 1908 ms
+; A -> Ben is right because display is a primitive procedure,
+; so all arguments will be forced when the display expr is evaluated.
+(eval-with-env
+  '(begin
+      (define (for-each proc items)
+        (if (null? items)
+          'done
+          (begin (proc (car items))
+                 (for-each proc (cdr items)))))
+      (for-each (lambda (x) (display x) (newline))
+        (list 57 321 88))))
+
+; B
+; without changes:
+;  (p1 1) -> (1 2)
+;  (p2 1) -> 1 : the set! call (e in p) is a thunk that doesn't get forced 
+; with changes:
+;  (p1 1) -> (1 2)
+;  (p2 1) -> (1 2) : the set! call is now forced
+(eval-with-env
+  '(begin
+    (define (p1 x)
+      (set! x (cons x '(2)))
+      x)
+    (define (p2 x)
+      (define (p e)
+        e 
+        x)
+      (p (set! x (cons x '(2)))))
+    (p1 1)))
+
+; C
+; Calling (actual-value) on some obj that isn't a thunk just returns that obj
+; The arguments are forced already anyway since they are passed to the primitive display
+; so calling actual-value on them again doesn't do anything.
+
+; D
+; Cy's approach is nice to ensure that side effects take place.
+; presumably, sequences are written because you need their side effects so it would make
+; sense for the language to force them to happen in the proper order.
+
+
+
 
 (display "TESTS PASS") (newline)
 
