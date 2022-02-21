@@ -7,7 +7,7 @@
 (#%require "assert.rkt")
 
 (define (eval-with-env expr)
-  (myeval expr (setup-environment)))
+  (actual-value expr (setup-environment)))
 
 (assert-eq (eval-with-env '3) 3)
 (assert-eq (eval-with-env '(+ 1 2)) 3)
@@ -122,6 +122,13 @@
     '(unless (> 4 3) 123 456))
   123)
 
+; lazy test
+(assert-eq
+  (eval-with-env
+    '(begin
+        (define (try a b) (if (= a 0) ((lambda () (- 5 4))) b))
+        (try 0 (/ 1 0))))
+  1)
 
 (display "TESTS PASS") (newline)
 
@@ -131,3 +138,12 @@
 ; (eval-with-env '(begin
 ;                   (define x 4)
 ;                   (+ y 3)))
+
+
+; fails with using myeval instead of actual-value on operator
+; because op is a thunk
+(eval-with-env
+  '(begin
+    (define (id x) x)
+    (define op (id (id +)))
+    (op 3 4)))
