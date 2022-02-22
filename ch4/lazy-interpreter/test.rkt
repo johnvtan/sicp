@@ -25,15 +25,7 @@
       (define (map proc items)
         (if (null? items)
           '()
-          (cons (proc (car items)) (map proc (cdr items)))))
-
-      (define (scale-list items factor)
-        (map (lambda (x) (* x factor)) items))
-
-      (define (add-lists list1 list2)
-        (cond [(null? list1) list2]
-              [(null? list2) list1]
-              [else (cons (+ (car list1) (car list2)) (add-lists (cdr list1) (cdr list2)))]))))
+          (cons (proc (car items)) (map proc (cdr items)))))))
   (let [(env (setup-environment))]
     (myeval list-op-defs env)
     (actual-value expr env)))
@@ -160,20 +152,33 @@
   1)
 
 (assert-eq
-  (eval-with-lazy-lists
-    '(begin
-      (define ones (cons 1 ones))
-      (define integers (cons 1 (add-lists ones integers)))
-      (list-ref integers 17)))
-  18)
-
-(assert-eq
   (eval-with-env
     '(begin
       (define x 5)
       (define x 23)
       x))
   23)
+
+(assert-eq
+  (eval-with-lazy-lists
+    '(begin
+      (define (add-lists list1 list2)
+        (cond
+          [(null? list1) list2]
+          [(null? list2) list1]
+          [else (cons (+ (car list1) (car list2))
+                      (add-lists (cdr list1) (cdr list2)))]))
+      (define ones (cons 1 ones))
+      (define integers (cons 1 (add-lists ones integers)))
+      (list-ref integers 17)))
+  18)
+
+(assert-eq
+  (eval-with-lazy-lists
+    '(begin
+      (car (cdr '(1 2 3)))))
+  2)
+
 
 (display "TESTS PASS") (newline)
 

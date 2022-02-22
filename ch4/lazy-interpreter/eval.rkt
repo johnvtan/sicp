@@ -5,6 +5,12 @@
 (#%require "syntax.rkt")
 (#%require "environment.rkt")
 
+(define (make-cons a b) (list 'cons a b))
+(define (list->cons lst)
+  (if (null? lst)
+    '()
+    (make-cons (car lst) (list->cons (cdr lst)))))
+
 ; Evaluates each element in exps
 ; This is how applicative order is implemented
 ; Before each call to myapply, list-of-values is called
@@ -57,7 +63,7 @@
     [(variable? exp) (lookup-variable-value exp env)]
 
     ; Quotes get the text of the symbol, e.g. 'text -> text
-    [(quoted? exp) (text-of-quotation exp)]
+    [(quoted? exp) (myeval (list->cons (text-of-quotation exp)) env)]
 
     [(assignment? exp) (myeval-assignment exp env)]
     [(definition? exp) 
