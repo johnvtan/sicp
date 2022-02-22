@@ -127,9 +127,53 @@
 (assert-eq
   (eval-with-env
     '(begin
-        (define (try a b) (if (= a 0) ((lambda () (- 5 4))) b))
+        (define (try (a lazy) (b lazy)) (if (= a 0) ((lambda () (- 5 4))) b))
         (try 0 (/ 1 0))))
   1)
+
+; 1. design a test for this
+; probably reliant on set! to show delayed side effects
+(assert-eq
+  (eval-with-env
+    '(begin
+      (define a 0)
+      (define b 0)
+      (define c 0)
+      (define d 0)
+      (define (f a (b lazy) c (d lazy-memo))
+        a b c d
+        ; force it to be called by passing it to primitive
+        ; (list a a b b b c c d d d)
+        'done)
+      (f (set! a (+ a 32)) (set! b (+ b 1)) (set! c (+ c 123)) (set! d (+ d 1)))
+      (list a b c d)))
+
+  ; a is forced on function enter once
+  ; b is lazy and not forced 
+  ; c is forced on function enter once
+  ; d is lazy and not forced 
+  (list 32 0 123 0))
+
+(assert-eq
+  (eval-with-env
+    '(begin
+      (define a 0)
+      (define b 0)
+      (define c 0)
+      (define d 0)
+      (define (f a (b lazy) c (d lazy-memo))
+        ; force it to be called by passing it to primitive
+        (list a a b b b c c d d d)
+        'done)
+      (f (set! a (+ a 32)) (set! b (+ b 1)) (set! c (+ c 123)) (set! d (+ d 1)))
+      (list a b c d)))
+
+  ; a is forced on function enter once
+  ; b is lazy and not memoized so called 3 times 
+  ; c is forced on function enter once
+  ; d is lazy and memoized so only called once 
+  (list 32 3 123 1))
+
 
 (display "TESTS PASS") (newline)
 
