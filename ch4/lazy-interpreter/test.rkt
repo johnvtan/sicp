@@ -10,6 +10,34 @@
 (define (eval-with-env expr)
   (actual-value expr (setup-environment)))
 
+(define (eval-with-lazy-lists expr)
+  (define list-op-defs
+    '(begin
+      (define (cons x y) (lambda (m) (m x y)))
+      (define (car z) (z (lambda (p q) p)))
+      (define (cdr z) (z (lambda (p q) q)))
+
+      (define (list-ref items n)
+        (if (= n 0)
+          (car items)
+          (list-ref (cdr items) (- n 1))))
+
+      (define (map proc items)
+        (if (null? items)
+          '()
+          (cons (proc (car items)) (map proc (cdr items)))))
+
+      (define (scale-list items factor)
+        (map (lambda (x) (* x factor)) items))
+
+      (define (add-lists list1 list2)
+        (cond [(null? list1) list2]
+              [(null? list2) list1]
+              [else (cons (+ (car list1) (car list2)) (add-lists (cdr list1) (cdr list2)))]))))
+  (let [(env (setup-environment))]
+    (myeval list-op-defs env)
+    (actual-value expr env)))
+
 (assert-eq (eval-with-env '3) 3)
 (assert-eq (eval-with-env '(+ 1 2)) 3)
 (assert-eq (eval-with-env '(* 4 3)) 12)
@@ -130,6 +158,22 @@
         (define (try a b) (if (= a 0) ((lambda () (- 5 4))) b))
         (try 0 (/ 1 0))))
   1)
+
+(assert-eq
+  (eval-with-lazy-lists
+    '(begin
+      (define ones (cons 1 ones))
+      (define integers (cons 1 (add-lists ones integers)))
+      (list-ref integers 17)))
+  18)
+
+(assert-eq
+  (eval-with-env
+    '(begin
+      (define x 5)
+      (define x 23)
+      x))
+  23)
 
 (display "TESTS PASS") (newline)
 

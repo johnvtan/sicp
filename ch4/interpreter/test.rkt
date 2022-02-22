@@ -122,6 +122,14 @@
     '(unless (> 4 3) 123 456))
   123)
 
+(assert-eq
+  (eval-with-env
+    '(begin
+      (define x 5)
+      (define x 23)
+      x))
+  23)
+
 (display "TESTS PASS") (newline)
 
 ; I don't feel like figuring out how to write a macro that catches exceptions

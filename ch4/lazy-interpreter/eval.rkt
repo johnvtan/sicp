@@ -38,8 +38,9 @@
                        env)
   'ok)
 
+; TODO redefining primitves doesn't work...
 (define (myeval-definition exp env)
-  ;(display 'myeval-definition) (newline)
+  ;(display (list 'myeval-definition (definition-variable exp) (definition-value exp))) (newline)
   (define-variable! (definition-variable exp)
                     (myeval (definition-value exp) env)
                     env))
@@ -59,7 +60,9 @@
     [(quoted? exp) (text-of-quotation exp)]
 
     [(assignment? exp) (myeval-assignment exp env)]
-    [(definition? exp) (myeval-definition exp env)]
+    [(definition? exp) 
+      (myeval-definition exp env)]
+      ;(display (list 'definition exp env)) (newline)]
     [(if? exp) (myeval-if exp env)]
 
     ; Creates a procedure, which can be passed to myapply
@@ -93,6 +96,7 @@
 (define (myapply procedure arguments env)
   (cond
     [(primitive-procedure? procedure)
+      ;(display (list 'primitive-procedure procedure arguments)) (newline)
       (myapply-primitive-procedure procedure
         (list-of-arg-values arguments env))]
     [(compound-procedure? procedure)

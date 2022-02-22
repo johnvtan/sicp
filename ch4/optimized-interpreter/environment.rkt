@@ -60,7 +60,7 @@
 (define (define-variable! var val env)
   (let [(frame (first-frame env))]
     (scan-frame (frame-variables frame) (frame-values frame) var
-      (lambda (vars vals) (set-car! vars val))
+      (lambda (vars vals) (set-car! vals val))
       (lambda () (add-binding-to-frame! var val frame)))))
 
 (define primitive-procedures
