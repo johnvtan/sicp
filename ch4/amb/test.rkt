@@ -114,6 +114,36 @@
         (+ x 45))))
   48)
 
+; amb test cases
+(assert-eq
+  (eval-with-env
+    '(begin 
+      (define (prime? n)
+        (define (smallest-divisor-simple n)
+          (define (divides? a b)
+            (= (remainder b a) 0))
+          (define (find-divisor n test)
+            (cond 
+              [(> (* test test) n) n]
+              [(divides? test n) test]
+              [else (find-divisor n (+ test 1))]))
+          (find-divisor n 2))
+        (= (smallest-divisor-simple n) n))
+
+      (define (require p) (if (not p) (amb)))
+      (define (an-element-of items)
+        (require (not (null? items)))
+        (amb (car items) (an-element-of (cdr items))))
+
+      (define (prime-sum-pair list1 list2)
+        (let [(a (an-element-of list1))
+              (b (an-element-of list2))]
+          (require (prime? (+ a b)))
+          (list a b)))
+
+      (prime-sum-pair '(5 1 3 8) '(20 35 110))))
+  '(3 20))
+
 
 (display "TESTS PASS") (newline)
 
