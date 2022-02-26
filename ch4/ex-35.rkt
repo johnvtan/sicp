@@ -29,9 +29,10 @@
             (require (= (+ (* i i) (* j j)) (* k k)))
             (list i j k)))))
     
-    (a-pythagorean-triple-between 20 30)))
+    (a-pythagorean-triple-between 1 30)))
 
 (myeval prog (setup-environment)
-  (lambda (value fail)
-    (display value) (newline))
-  (lambda () (error "FAILED")))
+  (lambda (value alt)
+    (display value) (newline)
+    (alt))
+  (lambda () 'done))
