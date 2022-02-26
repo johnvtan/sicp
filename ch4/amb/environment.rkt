@@ -77,6 +77,8 @@
         (list '< <)
         (list '> >)
         (list '= =)
+        (list '>= >=)
+        (list '<= <=)
         (list 'remainder remainder)
         (list 'not not)))
 
